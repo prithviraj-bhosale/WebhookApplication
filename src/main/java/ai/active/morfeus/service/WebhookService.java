@@ -41,24 +41,34 @@ public class WebhookService {
     this.objectMapper = objectMapper;
   }
 
+  /**
+   *
+   * @return static text message
+   */
   public String getDownloadStatus() {
     return STATUS;
   }
 
+  /**
+   *
+   * @return manipulated payload for Template creation
+   */
   public List<Map<String, Object>> getBookings() {
     try {
       InputStream resourceAsStream =
           resourceLoader.getResource(CLASSPATH + Constants.FOLDER_PATH + Constants.BOOKINGS + Constants.JSON).getInputStream();
       JsonNode bookingDetails = objectMapper.readValue(resourceAsStream, JsonNode.class);
       return formPayloadFromJson(bookingDetails);
-//      return objectMapper.readValue( resourceAsStream,new TypeReference<List<Map<String, Object>>>() {
-//      });
     } catch (IOException e) {
       ApplicationLogger.logError("Error while gettings bookings : ", e);
       return Collections.emptyList();
     }
   }
 
+  /**
+   *
+   * @return raw payload as List<Map<String, Object>>
+   */
   public List<Map<String, Object>> getBookingsPayload() {
     try {
       InputStream resourceAsStream =
@@ -86,8 +96,12 @@ public class WebhookService {
     return listOfFlights;
   }
 
+  /**
+   *
+   * @param request
+   * @return MorfeusWebhookResponse with Template
+   */
   public MorfeusWebhookResponse getDownloadStatusAsTemplate(MorfeusWebhookRequest request) {
-
     WorkflowValidationResponse workflowValidationResponse = new WorkflowValidationResponse.Builder(Status.SUCCESS).build();
     Content content = new Content();
     content.setImage("https://i.ibb.co/GRzCZpp/success.gif");
