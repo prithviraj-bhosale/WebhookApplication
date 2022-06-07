@@ -1,9 +1,11 @@
 package ai.active.morfeus.controller;
 
+import ai.active.fulfillment.webhook.WebhookUtil;
 import ai.active.fulfillment.webhook.data.request.MorfeusWebhookRequest;
 import ai.active.fulfillment.webhook.data.response.MorfeusWebhookResponse;
 import ai.active.fulfillment.webhook.data.response.Status;
 import ai.active.fulfillment.webhook.data.response.WebhookResponse;
+import ai.active.morfeus.Exception.Validation;
 import ai.active.morfeus.service.WebhookService;
 import ai.active.morfeus.utils.TemplateConversionUtil;
 import com.fasterxml.jackson.databind.ObjectMapper;
@@ -20,6 +22,8 @@ import org.springframework.web.bind.annotation.RestController;
 
 import javax.servlet.http.HttpServletResponse;
 import java.io.IOException;
+import java.security.InvalidKeyException;
+import java.security.NoSuchAlgorithmException;
 import java.util.Arrays;
 import java.util.HashMap;
 import java.util.Map;
@@ -35,6 +39,8 @@ public class WebhookController {
     @Autowired
     private TemplateConversionUtil templateConsversionUtil;
 
+    private static final String secret = "morFeu5";
+
 
     public WebhookController(ObjectMapper objectMapper) {
         this.objectMapper = objectMapper;
@@ -48,15 +54,21 @@ public class WebhookController {
         @ApiResponse(responseCode = "401", description = "Not authorised!", content = @Content(schema = @Schema(example = "{\"errorCode\":\"401\",\"description\":\"Not Authorised!\"}"))),})
     @PostMapping(path = "/view/bookings", consumes = "application/json", produces = "application/json")
     public WebhookResponse getBookings(@RequestBody(required = true) String body,
-        @RequestHeader(name = "X-Hub-Signature", required = true) String signature, HttpServletResponse response) throws IOException {
+        @RequestHeader(name = "X-Hub-Signature", required = true) String signature, HttpServletResponse response) throws Exception {
         MorfeusWebhookRequest request = objectMapper.readValue(body, MorfeusWebhookRequest.class);
+        String s = WebhookUtil.generateSignature(objectMapper.writeValueAsString(request), secret);
         WebhookResponse morfeusWebhookResponse = new WebhookResponse();
-        morfeusWebhookResponse.setMessages(Arrays.asList(templateConsversionUtil.showCarouselTemplate(webhookService.getBookings())));
-        String[] params = new String[2];
-        params[0] = "USER11";
-        params[1] = "xx5224";
-        morfeusWebhookResponse.setStatus(Status.SUCCESS);
-        return morfeusWebhookResponse;
+        if (s.equals(signature)) {
+            morfeusWebhookResponse.setMessages(Arrays.asList(templateConsversionUtil.showCarouselTemplate(webhookService.getBookings())));
+            String[] params = new String[2];
+            params[0] = "USER11";
+            params[1] = "xx5224";
+            morfeusWebhookResponse.setStatus(Status.SUCCESS);
+            return morfeusWebhookResponse;
+        } else {
+            morfeusWebhookResponse.setStatus(Status.FAILED);
+            throw new Validation("Signature Mismatch", 404);
+        }
     }
 
     @Operation(tags = "Webhook to get status", summary = "Get Booking status", requestBody = @io.swagger.v3.oas.annotations.parameters.RequestBody(content = @Content(schema = @Schema(example = "{\"id\":\"eb9f3d03-d6f2-442e-bb75-f7770ac0bbe9\",\"event\":\"wf_prompt\",\"user\":{\"id\":\"9\",\"profile\":{\"firstName\":\"918983726887\"},\"channel_id\":\"918983726887\",\"logged_id\":false,\"customer_id\":\"918983726887\"},\"bot\":{\"id\":\"2\",\"channel_type\":\"wn\",\"channel_id\":\"6531632959\",\"developer_mode\":true,\"sync\":false},\"request\":{\"type\":\"text\",\"text\":\"show\"},\"nlp\":{\"version\":\"v1\",\"data\":{\"intent\":{\"name\":\"show-more\",\"feature\":null,\"confidence\":100,\"classifierName\":\"ruleEngine\",\"adversarialScore\":null,\"starter\":true,\"userSelection\":false},\"intents\":[{\"name\":\"qry-accountenquiry\",\"feature\":null,\"confidence\":93.56175065040588,\"classifierName\":\"unifiedAPIv2Engine\",\"adversarialScore\":0.449097007513,\"starter\":false,\"userSelection\":false}],\"entities\":{\"intentModifier\":[{\"name\":\"intentModifier\",\"value\":null,\"extractorName\":\"unifiedAPIv2Engine\",\"modifiers\":[]},{\"name\":\"intentModifier\",\"value\":\"\",\"extractorName\":\"unifiedAPIv2Engine\",\"modifiers\":null}]},\"sentimentReport\":{\"positiveConfidence\":null,\"negativeConfidence\":null,\"neutralConfidence\":null,\"polarity\":null},\"parseOutputs\":[{\"action\":{\"name\":\"view\"}}],\"langCode\":\"en\",\"tentativeContextChange\":false,\"compoundQuery\":false,\"maskedMessage\":\"show\"}},\"workflow\":{\"additionalParams\":null,\"workflowVariables\":{\"parse_product\":\"view\"},\"globalVariables\":null,\"requestVariables\":{},\"nodeId\":\"Step-2\",\"workflowId\":\"show-more\",\"status\":\"proceed\",\"dataVersion\":null,\"enableJumpNode\":true}}"))))
@@ -67,15 +79,22 @@ public class WebhookController {
         @ApiResponse(responseCode = "401", description = "Not authorised!", content = @Content(schema = @Schema(example = "{\"errorCode\":\"401\",\"description\":\"Not Authorised!\"}"))),})
     @PostMapping(path = "/download/status", consumes = "application/json", produces = "application/json")
     public MorfeusWebhookResponse getBlockStatus(@RequestBody(required = true) String body,
-        @RequestHeader(name = "X-Hub-Signature", required = true) String signature, HttpServletResponse response) throws IOException {
+        @RequestHeader(name = "X-Hub-Signature", required = true) String signature, HttpServletResponse response)
+        throws IOException, Validation, InvalidKeyException, NoSuchAlgorithmException {
         MorfeusWebhookRequest request = objectMapper.readValue(body, MorfeusWebhookRequest.class);
         MorfeusWebhookResponse morfeusWebhookResponse = new MorfeusWebhookResponse();
-        morfeusWebhookResponse.setMessages(Arrays.asList(templateConsversionUtil.showTextMessage(webhookService.getDownloadStatus())));
-        Map<String, Object> custPref = new HashMap<>();
-        custPref.put("new ", "new ");
-        morfeusWebhookResponse.setExtraData(custPref);
-        morfeusWebhookResponse.setStatus(Status.SUCCESS);
-        return morfeusWebhookResponse;
+        String s = WebhookUtil.generateSignature(objectMapper.writeValueAsString(request), secret);
+        if (s.equals(signature)) {
+            morfeusWebhookResponse.setMessages(Arrays.asList(templateConsversionUtil.showTextMessage(webhookService.getDownloadStatus())));
+            Map<String, Object> custPref = new HashMap<>();
+            custPref.put("new ", "new ");
+            morfeusWebhookResponse.setExtraData(custPref);
+            morfeusWebhookResponse.setStatus(Status.SUCCESS);
+            return morfeusWebhookResponse;
+        } else {
+            morfeusWebhookResponse.setStatus(Status.FAILED);
+            throw new Validation("Signature Mismatch", 404);
+        }
     }
 
     @Operation(tags = "Webhook to get status", summary = "Get Booking status", requestBody = @io.swagger.v3.oas.annotations.parameters.RequestBody(content = @Content(schema = @Schema(example = "{\"id\":\"eb9f3d03-d6f2-442e-bb75-f7770ac0bbe9\",\"event\":\"wf_prompt\",\"user\":{\"id\":\"9\",\"profile\":{\"firstName\":\"918983726887\"},\"channel_id\":\"918983726887\",\"logged_id\":false,\"customer_id\":\"918983726887\"},\"bot\":{\"id\":\"2\",\"channel_type\":\"wn\",\"channel_id\":\"6531632959\",\"developer_mode\":true,\"sync\":false},\"request\":{\"type\":\"text\",\"text\":\"show\"},\"nlp\":{\"version\":\"v1\",\"data\":{\"intent\":{\"name\":\"show-more\",\"feature\":null,\"confidence\":100,\"classifierName\":\"ruleEngine\",\"adversarialScore\":null,\"starter\":true,\"userSelection\":false},\"intents\":[{\"name\":\"qry-accountenquiry\",\"feature\":null,\"confidence\":93.56175065040588,\"classifierName\":\"unifiedAPIv2Engine\",\"adversarialScore\":0.449097007513,\"starter\":false,\"userSelection\":false}],\"entities\":{\"intentModifier\":[{\"name\":\"intentModifier\",\"value\":null,\"extractorName\":\"unifiedAPIv2Engine\",\"modifiers\":[]},{\"name\":\"intentModifier\",\"value\":\"\",\"extractorName\":\"unifiedAPIv2Engine\",\"modifiers\":null}]},\"sentimentReport\":{\"positiveConfidence\":null,\"negativeConfidence\":null,\"neutralConfidence\":null,\"polarity\":null},\"parseOutputs\":[{\"action\":{\"name\":\"view\"}}],\"langCode\":\"en\",\"tentativeContextChange\":false,\"compoundQuery\":false,\"maskedMessage\":\"show\"}},\"workflow\":{\"additionalParams\":null,\"workflowVariables\":{\"parse_product\":\"view\"},\"globalVariables\":null,\"requestVariables\":{},\"nodeId\":\"Step-2\",\"workflowId\":\"show-more\",\"status\":\"proceed\",\"dataVersion\":null,\"enableJumpNode\":true}}"))))
@@ -86,10 +105,20 @@ public class WebhookController {
         @ApiResponse(responseCode = "401", description = "Not authorised!", content = @Content(schema = @Schema(example = "{\"errorCode\":\"401\",\"description\":\"Not Authorised!\"}"))),})
     @PostMapping(path = "/download/status/template", consumes = "application/json", produces = "application/json")
     public MorfeusWebhookResponse getBlockStatusTemplate(@RequestBody(required = true) String body,
-        @RequestHeader(name = "X-Hub-Signature", required = true) String signature, HttpServletResponse response) throws IOException {
+        @RequestHeader(name = "X-Hub-Signature", required = true) String signature, HttpServletResponse response)
+        throws IOException, Validation, InvalidKeyException, NoSuchAlgorithmException {
         MorfeusWebhookRequest request = objectMapper.readValue(body, MorfeusWebhookRequest.class);
-        MorfeusWebhookResponse morfeusWebhookResponse = webhookService.getDownloadStatusAsTemplate(request);
-        morfeusWebhookResponse.setStatus(Status.SUCCESS);
-        return morfeusWebhookResponse;
+        MorfeusWebhookResponse morfeusWebhookResponse = new MorfeusWebhookResponse();
+        String s = WebhookUtil.generateSignature(objectMapper.writeValueAsString(request), secret);
+        if (s.equals(signature)) {
+            morfeusWebhookResponse = webhookService.getDownloadStatusAsTemplate(request);
+            morfeusWebhookResponse.setStatus(Status.SUCCESS);
+            return morfeusWebhookResponse;
+        } else {
+            morfeusWebhookResponse.setStatus(Status.FAILED);
+            throw new Validation("Signature Mismatch", 404);
+        }
     }
+
+
 }
