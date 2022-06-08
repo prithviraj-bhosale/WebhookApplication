@@ -8,6 +8,8 @@ import ai.active.fulfillment.webhook.data.response.WebhookResponse;
 import ai.active.morfeus.Exception.Validation;
 import ai.active.morfeus.service.WebhookService;
 import ai.active.morfeus.utils.TemplateConversionUtil;
+import com.fasterxml.jackson.core.JsonProcessingException;
+import com.fasterxml.jackson.databind.JsonMappingException;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.media.Content;
@@ -15,10 +17,7 @@ import io.swagger.v3.oas.annotations.media.Schema;
 import io.swagger.v3.oas.annotations.responses.ApiResponse;
 import io.swagger.v3.oas.annotations.responses.ApiResponses;
 import org.springframework.beans.factory.annotation.Autowired;
-import org.springframework.web.bind.annotation.PostMapping;
-import org.springframework.web.bind.annotation.RequestBody;
-import org.springframework.web.bind.annotation.RequestHeader;
-import org.springframework.web.bind.annotation.RestController;
+import org.springframework.web.bind.annotation.*;
 
 import javax.servlet.http.HttpServletResponse;
 import java.io.IOException;
@@ -142,6 +141,22 @@ public class WebhookController {
       morfeusWebhookResponse.setStatus(Status.FAILED);
       throw new Validation("Signature Mismatch", 404);
     }
+  }
+
+  @Operation(tags = "Webhook api to get the signature", summary = "Get SHA signature that can we used to test other api via swagger", requestBody = @io.swagger.v3.oas.annotations.parameters.RequestBody(content = @Content(schema = @Schema(example = "{\"id\":\"eb9f3d03-d6f2-442e-bb75-f7770ac0bbe9\",\"event\":\"wf_prompt\",\"user\":{\"id\":\"9\",\"profile\":{\"firstName\":\"918983726887\"},\"channel_id\":\"918983726887\",\"logged_id\":false,\"customer_id\":\"918983726887\"},\"bot\":{\"id\":\"2\",\"channel_type\":\"wn\",\"channel_id\":\"6531632959\",\"developer_mode\":true,\"sync\":false},\"request\":{\"type\":\"text\",\"text\":\"show\"},\"nlp\":{\"version\":\"v1\",\"data\":{\"intent\":{\"name\":\"show-more\",\"feature\":null,\"confidence\":100,\"classifierName\":\"ruleEngine\",\"adversarialScore\":null,\"starter\":true,\"userSelection\":false},\"intents\":[{\"name\":\"qry-accountenquiry\",\"feature\":null,\"confidence\":93.56175065040588,\"classifierName\":\"unifiedAPIv2Engine\",\"adversarialScore\":0.449097007513,\"starter\":false,\"userSelection\":false}],\"entities\":{\"intentModifier\":[{\"name\":\"intentModifier\",\"value\":null,\"extractorName\":\"unifiedAPIv2Engine\",\"modifiers\":[]},{\"name\":\"intentModifier\",\"value\":\"\",\"extractorName\":\"unifiedAPIv2Engine\",\"modifiers\":null}]},\"sentimentReport\":{\"positiveConfidence\":null,\"negativeConfidence\":null,\"neutralConfidence\":null,\"polarity\":null},\"parseOutputs\":[{\"action\":{\"name\":\"view\"}}],\"langCode\":\"en\",\"tentativeContextChange\":false,\"compoundQuery\":false,\"maskedMessage\":\"show\"}},\"workflow\":{\"additionalParams\":null,\"workflowVariables\":{\"parse_product\":\"view\"},\"globalVariables\":null,\"requestVariables\":{},\"nodeId\":\"Step-2\",\"workflowId\":\"show-more\",\"status\":\"proceed\",\"dataVersion\":null,\"enableJumpNode\":true}}"))))
+  @ApiResponses(value = {@ApiResponse(responseCode = "200", description = "Success", content = @Content(schema = @Schema(example = "sha1=0d34707434ac03e792490a926eecf5517def5123"))),
+      @ApiResponse(responseCode = "500", description = "Internal server Error", content = @Content(schema = @Schema(example = "{\"errorCode\":\"500\",\"description\":\"Internal server error!\"}"))),
+      @ApiResponse(responseCode = "404", description = "Bot not found!", content = @Content(schema = @Schema(example = "{\"errorCode\":\"404\",\"description\":\"Bot not found\"}"))),
+      @ApiResponse(responseCode = "401", description = "Not authorised!", content = @Content(schema = @Schema(example = "{\"errorCode\":\"401\",\"description\":\"Not Authorised!\"}"))),})
+  @PostMapping(path = "/signature", consumes = "application/json",produces = "text/plain")
+  public String getSignature(@RequestBody(required = true) String body, @RequestHeader(name = "secretKey", required = true) String secret) {
+    try {
+      MorfeusWebhookRequest request = objectMapper.readValue(body, MorfeusWebhookRequest.class);
+      return WebhookUtil.generateSignature(objectMapper.writeValueAsString(request), secret);
+    } catch (NoSuchAlgorithmException | InvalidKeyException | JsonProcessingException e) {
+      e.printStackTrace();
+    }
+    return null;
   }
 
 
